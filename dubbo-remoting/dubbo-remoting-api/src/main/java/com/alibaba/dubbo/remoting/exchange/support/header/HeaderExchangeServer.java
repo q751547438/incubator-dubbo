@@ -29,7 +29,6 @@ import com.alibaba.dubbo.remoting.Server;
 import com.alibaba.dubbo.remoting.exchange.ExchangeChannel;
 import com.alibaba.dubbo.remoting.exchange.ExchangeServer;
 import com.alibaba.dubbo.remoting.exchange.Request;
-import com.alibaba.dubbo.remoting.exchange.support.DefaultFuture;
 
 import java.net.InetSocketAddress;
 import java.util.ArrayList;
@@ -77,6 +76,7 @@ public class HeaderExchangeServer implements ExchangeServer {
         return server;
     }
 
+    @Override
     public boolean isClosed() {
         return server.isClosed();
     }
@@ -84,18 +84,26 @@ public class HeaderExchangeServer implements ExchangeServer {
     private boolean isRunning() {
         Collection<Channel> channels = getChannels();
         for (Channel channel : channels) {
-            if (DefaultFuture.hasFuture(channel)) {
+
+            /**
+             *  If there are any client connections,
+             *  our server should be running.
+             */
+
+            if (channel.isConnected()) {
                 return true;
             }
         }
         return false;
     }
 
+    @Override
     public void close() {
         doClose();
         server.close();
     }
 
+    @Override
     public void close(final int timeout) {
         startClose();
         if (timeout > 0) {
@@ -126,7 +134,7 @@ public class HeaderExchangeServer implements ExchangeServer {
         Request request = new Request();
         request.setEvent(Request.READONLY_EVENT);
         request.setTwoWay(false);
-        request.setVersion(Version.getVersion());
+        request.setVersion(Version.getProtocolVersion());
 
         Collection<Channel> channels = getChannels();
         for (Channel channel : channels) {
@@ -151,6 +159,7 @@ public class HeaderExchangeServer implements ExchangeServer {
         }
     }
 
+    @Override
     public Collection<ExchangeChannel> getExchangeChannels() {
         Collection<ExchangeChannel> exchangeChannels = new ArrayList<ExchangeChannel>();
         Collection<Channel> channels = server.getChannels();
@@ -162,36 +171,44 @@ public class HeaderExchangeServer implements ExchangeServer {
         return exchangeChannels;
     }
 
+    @Override
     public ExchangeChannel getExchangeChannel(InetSocketAddress remoteAddress) {
         Channel channel = server.getChannel(remoteAddress);
         return HeaderExchangeChannel.getOrAddChannel(channel);
     }
 
+    @Override
     @SuppressWarnings({"unchecked", "rawtypes"})
     public Collection<Channel> getChannels() {
         return (Collection) getExchangeChannels();
     }
 
+    @Override
     public Channel getChannel(InetSocketAddress remoteAddress) {
         return getExchangeChannel(remoteAddress);
     }
 
+    @Override
     public boolean isBound() {
         return server.isBound();
     }
 
+    @Override
     public InetSocketAddress getLocalAddress() {
         return server.getLocalAddress();
     }
 
+    @Override
     public URL getUrl() {
         return server.getUrl();
     }
 
+    @Override
     public ChannelHandler getChannelHandler() {
         return server.getChannelHandler();
     }
 
+    @Override
     public void reset(URL url) {
         server.reset(url);
         try {
@@ -213,11 +230,13 @@ public class HeaderExchangeServer implements ExchangeServer {
         }
     }
 
+    @Override
     @Deprecated
     public void reset(com.alibaba.dubbo.common.Parameters parameters) {
         reset(getUrl().addParameters(parameters.getParameters()));
     }
 
+    @Override
     public void send(Object message) throws RemotingException {
         if (closed.get()) {
             throw new RemotingException(this.getLocalAddress(), null, "Failed to send message " + message + ", cause: The server " + getLocalAddress() + " is closed!");
@@ -225,6 +244,7 @@ public class HeaderExchangeServer implements ExchangeServer {
         server.send(message);
     }
 
+    @Override
     public void send(Object message, boolean sent) throws RemotingException {
         if (closed.get()) {
             throw new RemotingException(this.getLocalAddress(), null, "Failed to send message " + message + ", cause: The server " + getLocalAddress() + " is closed!");
@@ -237,6 +257,7 @@ public class HeaderExchangeServer implements ExchangeServer {
         if (heartbeat > 0) {
             heartbeatTimer = scheduled.scheduleWithFixedDelay(
                     new HeartBeatTask(new HeartBeatTask.ChannelProvider() {
+                        @Override
                         public Collection<Channel> getChannels() {
                             return Collections.unmodifiableCollection(
                                     HeaderExchangeServer.this.getChannels());

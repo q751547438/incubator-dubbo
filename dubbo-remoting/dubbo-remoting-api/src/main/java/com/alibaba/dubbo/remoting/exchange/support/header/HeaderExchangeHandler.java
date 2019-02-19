@@ -103,6 +103,7 @@ public class HeaderExchangeHandler implements ChannelHandlerDelegate {
         return res;
     }
 
+    @Override
     public void connected(Channel channel) throws RemotingException {
         channel.setAttribute(KEY_READ_TIMESTAMP, System.currentTimeMillis());
         channel.setAttribute(KEY_WRITE_TIMESTAMP, System.currentTimeMillis());
@@ -114,6 +115,7 @@ public class HeaderExchangeHandler implements ChannelHandlerDelegate {
         }
     }
 
+    @Override
     public void disconnected(Channel channel) throws RemotingException {
         channel.setAttribute(KEY_READ_TIMESTAMP, System.currentTimeMillis());
         channel.setAttribute(KEY_WRITE_TIMESTAMP, System.currentTimeMillis());
@@ -121,10 +123,12 @@ public class HeaderExchangeHandler implements ChannelHandlerDelegate {
         try {
             handler.disconnected(exchangeChannel);
         } finally {
+            DefaultFuture.closeChannel(channel);
             HeaderExchangeChannel.removeChannelIfDisconnected(channel);
         }
     }
 
+    @Override
     public void sent(Channel channel, Object message) throws RemotingException {
         Throwable exception = null;
         try {
@@ -154,6 +158,7 @@ public class HeaderExchangeHandler implements ChannelHandlerDelegate {
         }
     }
 
+    @Override
     public void received(Channel channel, Object message) throws RemotingException {
         channel.setAttribute(KEY_READ_TIMESTAMP, System.currentTimeMillis());
         ExchangeChannel exchangeChannel = HeaderExchangeChannel.getOrAddChannel(channel);
@@ -191,6 +196,7 @@ public class HeaderExchangeHandler implements ChannelHandlerDelegate {
         }
     }
 
+    @Override
     public void caught(Channel channel, Throwable exception) throws RemotingException {
         if (exception instanceof ExecutionException) {
             ExecutionException e = (ExecutionException) exception;
@@ -214,6 +220,7 @@ public class HeaderExchangeHandler implements ChannelHandlerDelegate {
         }
     }
 
+    @Override
     public ChannelHandler getHandler() {
         if (handler instanceof ChannelHandlerDelegate) {
             return ((ChannelHandlerDelegate) handler).getHandler();

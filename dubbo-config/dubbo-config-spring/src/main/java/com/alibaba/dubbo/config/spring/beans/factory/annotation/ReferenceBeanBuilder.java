@@ -16,15 +16,24 @@
  */
 package com.alibaba.dubbo.config.spring.beans.factory.annotation;
 
+import com.alibaba.dubbo.common.utils.CollectionUtils;
 import com.alibaba.dubbo.config.ConsumerConfig;
 import com.alibaba.dubbo.config.annotation.Reference;
 import com.alibaba.dubbo.config.spring.ReferenceBean;
+
+import org.springframework.beans.propertyeditors.StringTrimmerEditor;
 import org.springframework.context.ApplicationContext;
 import org.springframework.util.Assert;
 import org.springframework.util.ClassUtils;
 import org.springframework.util.StringUtils;
+import org.springframework.validation.DataBinder;
 
-import static com.alibaba.dubbo.config.spring.util.BeanFactoryUtils.getOptionalBean;
+import java.beans.PropertyEditorSupport;
+import java.util.Map;
+
+import static com.alibaba.spring.util.BeanFactoryUtils.getOptionalBean;
+import static com.alibaba.spring.util.ObjectUtils.of;
+import static org.springframework.util.StringUtils.commaDelimitedListToStringArray;
 
 /**
  * {@link ReferenceBean} Builder
@@ -33,6 +42,8 @@ import static com.alibaba.dubbo.config.spring.util.BeanFactoryUtils.getOptionalB
  */
 class ReferenceBeanBuilder extends AbstractAnnotationConfigBeanBuilder<Reference, ReferenceBean> {
 
+    // Ignore those fields
+    static final String[] IGNORE_FIELD_NAMES = of("application", "module", "consumer", "monitor", "registry");
 
     private ReferenceBeanBuilder(Reference annotation, ClassLoader classLoader, ApplicationContext applicationContext) {
         super(annotation, classLoader, applicationContext);
@@ -80,13 +91,39 @@ class ReferenceBeanBuilder extends AbstractAnnotationConfigBeanBuilder<Reference
 
     @Override
     protected ReferenceBean doBuild() {
-        return new ReferenceBean<Object>(annotation);
+        return new ReferenceBean<Object>();
     }
 
     @Override
-    protected void preConfigureBean(Reference annotation, ReferenceBean bean) {
+    protected void preConfigureBean(Reference reference, ReferenceBean referenceBean) {
         Assert.notNull(interfaceClass, "The interface class must set first!");
+        DataBinder dataBinder = new DataBinder(referenceBean);
+        // Register CustomEditors for special fields
+        dataBinder.registerCustomEditor(String.class, "filter", new StringTrimmerEditor(true));
+        dataBinder.registerCustomEditor(String.class, "listener", new StringTrimmerEditor(true));
+        dataBinder.registerCustomEditor(Map.class, "parameters", new PropertyEditorSupport() {
+
+            public void setAsText(String text) throws java.lang.IllegalArgumentException {
+                // Trim all whitespace
+                String content = StringUtils.trimAllWhitespace(text);
+                if (!StringUtils.hasText(content)) { // No content , ignore directly
+                    return;
+                }
+                // replace "=" to ","
+                content = StringUtils.replace(content, "=", ",");
+                // replace ":" to ","
+                content = StringUtils.replace(content, ":", ",");
+                // String[] to Map
+                Map<String, String> parameters = CollectionUtils.toStringMap(commaDelimitedListToStringArray(content));
+                setValue(parameters);
+            }
+        });
+
+        // Bind annotation attributes
+        dataBinder.bind(new AnnotationPropertyValuesAdapter(reference, applicationContext.getEnvironment(), IGNORE_FIELD_NAMES));
+
     }
+
 
     @Override
     protected String resolveModuleConfigBeanName(Reference annotation) {

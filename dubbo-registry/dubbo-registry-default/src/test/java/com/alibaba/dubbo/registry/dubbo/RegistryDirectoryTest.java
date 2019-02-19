@@ -545,19 +545,19 @@ public class RegistryDirectoryTest {
         registryDirectory.notify(serviceUrls);
         List<Router> routers = registryDirectory.getRouters();
         //default invocation selector
-        Assert.assertEquals(1 + 1, routers.size());
+        Assert.assertEquals(3, routers.size());
         Assert.assertTrue(ScriptRouter.class == routers.get(1).getClass() || ScriptRouter.class == routers.get(0).getClass());
 
         registryDirectory.notify(new ArrayList<URL>());
         routers = registryDirectory.getRouters();
-        Assert.assertEquals(1 + 1, routers.size());
+        Assert.assertEquals(3, routers.size());
         Assert.assertTrue(ScriptRouter.class == routers.get(1).getClass() || ScriptRouter.class == routers.get(0).getClass());
 
         serviceUrls.clear();
         serviceUrls.add(routerurl.addParameter(Constants.ROUTER_KEY, Constants.ROUTER_TYPE_CLEAR));
         registryDirectory.notify(serviceUrls);
         routers = registryDirectory.getRouters();
-        Assert.assertEquals(0 + 1, routers.size());
+        Assert.assertEquals(2, routers.size());
     }
 
     /**
@@ -923,13 +923,13 @@ public class RegistryDirectoryTest {
         serviceUrls.add(routerurl);
         registryDirectory.notify(serviceUrls);
         List routers = registryDirectory.getRouters();
-        Assert.assertEquals(1 + 1, routers.size());
+        Assert.assertEquals(3, routers.size());
 
         serviceUrls.clear();
         serviceUrls.add(routerurl.addParameter(Constants.ROUTER_KEY, Constants.ROUTER_TYPE_CLEAR));
         registryDirectory.notify(serviceUrls);
         routers = registryDirectory.getRouters();
-        Assert.assertEquals(0 + 1, routers.size());
+        Assert.assertEquals(2, routers.size());
     }
 
     /**
@@ -1035,22 +1035,27 @@ public class RegistryDirectoryTest {
             this.destroyWithError = destroyWithError;
         }
 
+        @Override
         public void register(URL url) {
 
         }
 
+        @Override
         public void unregister(URL url) {
 
         }
 
+        @Override
         public void subscribe(URL url, NotifyListener listener) {
 
         }
 
+        @Override
         public void unsubscribe(URL url, NotifyListener listener) {
             if (latch != null) latch.countDown();
         }
 
+        @Override
         public List<URL> lookup(URL url) {
             return null;
         }
@@ -1059,10 +1064,12 @@ public class RegistryDirectoryTest {
             return null;
         }
 
+        @Override
         public boolean isAvailable() {
             return true;
         }
 
+        @Override
         public void destroy() {
             if (destroyWithError) {
                 throw new RpcException("test exception ignore.");

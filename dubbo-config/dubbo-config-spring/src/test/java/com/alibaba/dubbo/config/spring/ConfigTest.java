@@ -21,12 +21,19 @@ import com.alibaba.dubbo.common.URL;
 import com.alibaba.dubbo.common.extension.ExtensionLoader;
 import com.alibaba.dubbo.common.utils.NetUtils;
 import com.alibaba.dubbo.common.utils.StringUtils;
-import com.alibaba.dubbo.config.*;
+import com.alibaba.dubbo.config.ApplicationConfig;
+import com.alibaba.dubbo.config.ConsumerConfig;
+import com.alibaba.dubbo.config.ProtocolConfig;
+import com.alibaba.dubbo.config.ProviderConfig;
+import com.alibaba.dubbo.config.ReferenceConfig;
+import com.alibaba.dubbo.config.RegistryConfig;
+import com.alibaba.dubbo.config.ServiceConfig;
 import com.alibaba.dubbo.config.spring.action.DemoActionByAnnotation;
 import com.alibaba.dubbo.config.spring.action.DemoActionBySetter;
 import com.alibaba.dubbo.config.spring.annotation.consumer.AnnotationAction;
 import com.alibaba.dubbo.config.spring.api.DemoService;
 import com.alibaba.dubbo.config.spring.api.HelloService;
+import com.alibaba.dubbo.config.spring.context.annotation.provider.ProviderConfiguration;
 import com.alibaba.dubbo.config.spring.filter.MockFilter;
 import com.alibaba.dubbo.config.spring.impl.DemoServiceImpl;
 import com.alibaba.dubbo.config.spring.impl.HelloServiceImpl;
@@ -40,16 +47,23 @@ import com.alibaba.dubbo.rpc.RpcContext;
 import com.alibaba.dubbo.rpc.RpcException;
 import com.alibaba.dubbo.rpc.service.GenericException;
 import com.alibaba.dubbo.rpc.service.GenericService;
-import junit.framework.Assert;
+
+import org.junit.Assert;
 import org.junit.Ignore;
 import org.junit.Test;
 import org.springframework.beans.factory.BeanCreationException;
+import org.springframework.context.annotation.AnnotationConfigApplicationContext;
 import org.springframework.context.support.ClassPathXmlApplicationContext;
 
 import java.util.Collection;
 import java.util.List;
 
-import static org.junit.Assert.*;
+import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertNotNull;
+import static org.junit.Assert.assertNull;
+import static org.junit.Assert.assertThat;
+import static org.junit.Assert.assertTrue;
+import static org.junit.Assert.fail;
 import static org.junit.matchers.JUnitMatchers.containsString;
 
 
@@ -85,13 +99,29 @@ public class ConfigTest {
         ClassPathXmlApplicationContext ctx = new ClassPathXmlApplicationContext(ConfigTest.class.getPackage().getName().replace('.', '/') + "/service-class.xml");
         ctx.start();
         try {
-            DemoService demoService = refer("dubbo://127.0.0.1:20887");
+            DemoService demoService = refer("dubbo://127.0.0.1:30887");
             String hello = demoService.sayName("hello");
             assertEquals("welcome:hello", hello);
         } finally {
             ctx.stop();
             ctx.close();
         }
+    }
+
+    @Test
+    public void testServiceAnnotation() {
+        AnnotationConfigApplicationContext providerContext = new AnnotationConfigApplicationContext();
+        providerContext.register(ProviderConfiguration.class);
+
+        providerContext.refresh();
+
+        ReferenceConfig<HelloService> reference = new ReferenceConfig<HelloService>();
+        reference.setApplication(new ApplicationConfig("consumer"));
+        reference.setRegistry(new RegistryConfig(RegistryConfig.NO_AVAILABLE));
+        reference.setInterface(HelloService.class);
+        reference.setUrl("dubbo://127.0.0.1:12345");
+        String hello = reference.get().sayHello("hello");
+        assertEquals("Hello, hello", hello);
     }
 
     @Test
@@ -134,6 +164,19 @@ public class ConfigTest {
         assertTrue(str.contains(" url=\"dubbo://127.0.0.1:20881\" "));
         assertTrue(str.contains(" interface=\"com.alibaba.dubbo.config.spring.api.DemoService\" "));
         assertTrue(str.endsWith(" />"));
+    }
+
+    @Test
+    public void testForks() {
+        ReferenceConfig<DemoService> reference = new ReferenceConfig<DemoService>();
+        reference.setApplication(new ApplicationConfig("consumer"));
+        reference.setRegistry(new RegistryConfig(RegistryConfig.NO_AVAILABLE));
+        reference.setInterface(DemoService.class);
+        reference.setUrl("dubbo://127.0.0.1:20881");
+        int forks = 10;
+        reference.setForks(forks);
+        String str = reference.toString();
+        assertTrue(str.contains("forks=\"" + forks + "\""));
     }
 
     @Test
@@ -233,7 +276,7 @@ public class ConfigTest {
             }
             assertNotNull(urls);
             assertEquals(1, urls.size());
-            assertEquals("dubbo://" + NetUtils.getLocalHost() + ":20883/com.alibaba.dubbo.config.spring.api.DemoService", urls.get(0).toIdentityString());
+            assertEquals("dubbo://" + NetUtils.getLocalHost() + ":20888/com.alibaba.dubbo.config.spring.api.DemoService", urls.get(0).toIdentityString());
         } finally {
             ctx.stop();
             ctx.close();
@@ -251,7 +294,7 @@ public class ConfigTest {
             List<URL> urls = registryService.getRegistered().get("com.alibaba.dubbo.config.spring.api.DemoService");
             assertNotNull(urls);
             assertEquals(1, urls.size());
-            assertEquals("dubbo://" + NetUtils.getLocalHost() + ":20883/com.alibaba.dubbo.config.spring.api.DemoService", urls.get(0).toIdentityString());
+            assertEquals("dubbo://" + NetUtils.getLocalHost() + ":20888/com.alibaba.dubbo.config.spring.api.DemoService", urls.get(0).toIdentityString());
         } finally {
             ctx.stop();
             ctx.close();

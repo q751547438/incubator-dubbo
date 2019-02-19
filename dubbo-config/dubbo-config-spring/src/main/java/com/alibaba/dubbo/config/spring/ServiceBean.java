@@ -24,6 +24,7 @@ import com.alibaba.dubbo.config.ProviderConfig;
 import com.alibaba.dubbo.config.RegistryConfig;
 import com.alibaba.dubbo.config.ServiceConfig;
 import com.alibaba.dubbo.config.annotation.Service;
+import com.alibaba.dubbo.config.spring.context.event.ServiceBeanExportedEvent;
 import com.alibaba.dubbo.config.spring.extension.SpringExtensionFactory;
 
 import org.springframework.aop.support.AopUtils;
@@ -33,25 +34,27 @@ import org.springframework.beans.factory.DisposableBean;
 import org.springframework.beans.factory.InitializingBean;
 import org.springframework.context.ApplicationContext;
 import org.springframework.context.ApplicationContextAware;
+import org.springframework.context.ApplicationEventPublisher;
+import org.springframework.context.ApplicationEventPublisherAware;
 import org.springframework.context.ApplicationListener;
 import org.springframework.context.event.ContextRefreshedEvent;
-import org.springframework.context.support.AbstractApplicationContext;
 
-import java.lang.reflect.Method;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
+
+import static com.alibaba.dubbo.config.spring.util.BeanFactoryUtils.addApplicationListener;
 
 /**
  * ServiceFactoryBean
  *
  * @export
  */
-public class ServiceBean<T> extends ServiceConfig<T> implements InitializingBean, DisposableBean, ApplicationContextAware, ApplicationListener<ContextRefreshedEvent>, BeanNameAware {
+public class ServiceBean<T> extends ServiceConfig<T> implements InitializingBean, DisposableBean,
+        ApplicationContextAware, ApplicationListener<ContextRefreshedEvent>, BeanNameAware,
+        ApplicationEventPublisherAware {
 
     private static final long serialVersionUID = 213195494150089726L;
-
-    private static transient ApplicationContext SPRING_CONTEXT;
 
     private final transient Service service;
 
@@ -60,6 +63,8 @@ public class ServiceBean<T> extends ServiceConfig<T> implements InitializingBean
     private transient String beanName;
 
     private transient boolean supportedApplicationListener;
+
+    private ApplicationEventPublisher applicationEventPublisher;
 
     public ServiceBean() {
         super();
@@ -71,35 +76,14 @@ public class ServiceBean<T> extends ServiceConfig<T> implements InitializingBean
         this.service = service;
     }
 
-    public static ApplicationContext getSpringContext() {
-        return SPRING_CONTEXT;
-    }
-
+    @Override
     public void setApplicationContext(ApplicationContext applicationContext) {
         this.applicationContext = applicationContext;
         SpringExtensionFactory.addApplicationContext(applicationContext);
-        if (applicationContext != null) {
-            SPRING_CONTEXT = applicationContext;
-            try {
-                Method method = applicationContext.getClass().getMethod("addApplicationListener", new Class<?>[]{ApplicationListener.class}); // backward compatibility to spring 2.0.1
-                method.invoke(applicationContext, new Object[]{this});
-                supportedApplicationListener = true;
-            } catch (Throwable t) {
-                if (applicationContext instanceof AbstractApplicationContext) {
-                    try {
-                        Method method = AbstractApplicationContext.class.getDeclaredMethod("addListener", new Class<?>[]{ApplicationListener.class}); // backward compatibility to spring 2.0.1
-                        if (!method.isAccessible()) {
-                            method.setAccessible(true);
-                        }
-                        method.invoke(applicationContext, new Object[]{this});
-                        supportedApplicationListener = true;
-                    } catch (Throwable t2) {
-                    }
-                }
-            }
-        }
+        supportedApplicationListener = addApplicationListener(applicationContext, this);
     }
 
+    @Override
     public void setBeanName(String name) {
         this.beanName = name;
     }
@@ -113,6 +97,7 @@ public class ServiceBean<T> extends ServiceConfig<T> implements InitializingBean
         return service;
     }
 
+    @Override
     public void onApplicationEvent(ContextRefreshedEvent event) {
         if (isDelay() && !isExported() && !isUnexported()) {
             if (logger.isInfoEnabled()) {
@@ -131,6 +116,7 @@ public class ServiceBean<T> extends ServiceConfig<T> implements InitializingBean
         return supportedApplicationListener && (delay == null || delay == -1);
     }
 
+    @Override
     @SuppressWarnings({"unchecked", "deprecation"})
     public void afterPropertiesSet() throws Exception {
         if (getProvider() == null) {
@@ -262,17 +248,55 @@ public class ServiceBean<T> extends ServiceConfig<T> implements InitializingBean
         }
     }
 
+    /**
+     * Get the name of {@link ServiceBean}
+     *
+     * @return {@link ServiceBean}'s name
+     * @since 2.6.5
+     */
+    public String getBeanName() {
+        return this.beanName;
+    }
+
+    /**
+     * @since 2.6.5
+     */
+    @Override
+    public void export() {
+        super.export();
+        // Publish ServiceBeanExportedEvent
+        publishExportEvent();
+    }
+
+    /**
+     * @since 2.6.5
+     */
+    private void publishExportEvent() {
+        ServiceBeanExportedEvent exportEvent = new ServiceBeanExportedEvent(this);
+        applicationEventPublisher.publishEvent(exportEvent);
+    }
+
+    @Override
     public void destroy() throws Exception {
-        // This will only be called for singleton scope bean, and expected to be called by spring shutdown hook when BeanFactory/ApplicationContext destroys.
-        // We will guarantee dubbo related resources being released with dubbo shutdown hook.
-        //unexport();
+        // no need to call unexport() here, see
+        // org.apache.dubbo.config.spring.extension.SpringExtensionFactory.ShutdownHookListener
     }
 
     // merged from dubbox
+    @Override
     protected Class getServiceClass(T ref) {
         if (AopUtils.isAopProxy(ref)) {
             return AopUtils.getTargetClass(ref);
         }
         return super.getServiceClass(ref);
+    }
+
+    /**
+     * @param applicationEventPublisher
+     * @since 2.6.5
+     */
+    @Override
+    public void setApplicationEventPublisher(ApplicationEventPublisher applicationEventPublisher) {
+        this.applicationEventPublisher = applicationEventPublisher;
     }
 }

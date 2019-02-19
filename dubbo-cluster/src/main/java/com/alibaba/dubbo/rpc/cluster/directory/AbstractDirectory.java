@@ -28,6 +28,7 @@ import com.alibaba.dubbo.rpc.cluster.Directory;
 import com.alibaba.dubbo.rpc.cluster.Router;
 import com.alibaba.dubbo.rpc.cluster.RouterFactory;
 import com.alibaba.dubbo.rpc.cluster.router.MockInvokersSelector;
+import com.alibaba.dubbo.rpc.cluster.router.tag.TagRouter;
 
 import java.util.ArrayList;
 import java.util.Collections;
@@ -66,6 +67,7 @@ public abstract class AbstractDirectory<T> implements Directory<T> {
         setRouters(routers);
     }
 
+    @Override
     public List<Invoker<T>> list(Invocation invocation) throws RpcException {
         if (destroyed) {
             throw new RpcException("Directory already destroyed .url: " + getUrl());
@@ -86,6 +88,7 @@ public abstract class AbstractDirectory<T> implements Directory<T> {
         return invokers;
     }
 
+    @Override
     public URL getUrl() {
         return url;
     }
@@ -105,6 +108,7 @@ public abstract class AbstractDirectory<T> implements Directory<T> {
         }
         // append mock invoker selector
         routers.add(new MockInvokersSelector());
+        routers.add(new TagRouter());
         Collections.sort(routers);
         this.routers = routers;
     }
@@ -121,6 +125,7 @@ public abstract class AbstractDirectory<T> implements Directory<T> {
         return destroyed;
     }
 
+    @Override
     public void destroy() {
         destroyed = true;
     }

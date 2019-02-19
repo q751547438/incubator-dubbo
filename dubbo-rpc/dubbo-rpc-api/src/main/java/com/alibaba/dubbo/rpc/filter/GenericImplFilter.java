@@ -49,6 +49,7 @@ public class GenericImplFilter implements Filter {
 
     private static final Class<?>[] GENERIC_PARAMETER_TYPES = new Class<?>[]{String.class, String[].class, Object[].class};
 
+    @Override
     public Result invoke(Invoker<?> invoker, Invocation invocation) throws RpcException {
         String generic = invoker.getUrl().getParameter(Constants.GENERIC_KEY);
         if (ProtocolUtils.isGeneric(generic)
@@ -154,13 +155,13 @@ public class GenericImplFilter implements Filter {
 
                 for (Object arg : args) {
                     if (!(byte[].class == arg.getClass())) {
-                        error(byte[].class.getName(), arg.getClass().getName());
+                        error(generic, byte[].class.getName(), arg.getClass().getName());
                     }
                 }
             } else if (ProtocolUtils.isBeanGenericSerialization(generic)) {
                 for (Object arg : args) {
                     if (!(arg instanceof JavaBeanDescriptor)) {
-                        error(JavaBeanDescriptor.class.getName(), arg.getClass().getName());
+                        error(generic, JavaBeanDescriptor.class.getName(), arg.getClass().getName());
                     }
                 }
             }
@@ -171,10 +172,10 @@ public class GenericImplFilter implements Filter {
         return invoker.invoke(invocation);
     }
 
-    private void error(String expected, String actual) throws RpcException {
+    private void error(String generic, String expected, String actual) throws RpcException {
         throw new RpcException(
                 "Generic serialization [" +
-                        Constants.GENERIC_SERIALIZATION_NATIVE_JAVA +
+                        generic +
                         "] only support message type " +
                         expected +
                         " and your message type is " +

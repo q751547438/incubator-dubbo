@@ -24,7 +24,7 @@ import com.alibaba.dubbo.rpc.Invocation;
 import com.alibaba.dubbo.rpc.Invoker;
 import com.alibaba.dubbo.rpc.RpcContext;
 import com.alibaba.dubbo.rpc.RpcException;
-import com.alibaba.dubbo.rpc.cluster.Router;
+import com.alibaba.dubbo.rpc.cluster.router.AbstractRouter;
 
 import javax.script.Bindings;
 import javax.script.Compilable;
@@ -40,26 +40,23 @@ import java.util.concurrent.ConcurrentHashMap;
 
 /**
  * ScriptRouter
- *
  */
-public class ScriptRouter implements Router {
+public class ScriptRouter extends AbstractRouter {
 
     private static final Logger logger = LoggerFactory.getLogger(ScriptRouter.class);
+
+    private static final int DEFAULT_PRIORITY = 1;
 
     private static final Map<String, ScriptEngine> engines = new ConcurrentHashMap<String, ScriptEngine>();
 
     private final ScriptEngine engine;
 
-    private final int priority;
-
     private final String rule;
-
-    private final URL url;
 
     public ScriptRouter(URL url) {
         this.url = url;
         String type = url.getParameter(Constants.TYPE_KEY);
-        this.priority = url.getParameter(Constants.PRIORITY_KEY, 0);
+        this.priority = url.getParameter(Constants.PRIORITY_KEY, DEFAULT_PRIORITY);
         String rule = url.getParameterAndDecoded(Constants.RULE_KEY);
         if (type == null || type.length() == 0) {
             type = Constants.DEFAULT_SCRIPT_TYPE_KEY;
@@ -79,10 +76,7 @@ public class ScriptRouter implements Router {
         this.rule = rule;
     }
 
-    public URL getUrl() {
-        return url;
-    }
-
+    @Override
     @SuppressWarnings("unchecked")
     public <T> List<Invoker<T>> route(List<Invoker<T>> invokers, URL url, Invocation invocation) throws RpcException {
         try {
@@ -110,14 +104,6 @@ public class ScriptRouter implements Router {
             logger.error("route error , rule has been ignored. rule: " + rule + ", method:" + invocation.getMethodName() + ", url: " + RpcContext.getContext().getUrl(), e);
             return invokers;
         }
-    }
-
-    public int compareTo(Router o) {
-        if (o == null || o.getClass() != ScriptRouter.class) {
-            return 1;
-        }
-        ScriptRouter c = (ScriptRouter) o;
-        return this.priority == c.priority ? rule.compareTo(c.rule) : (this.priority > c.priority ? 1 : -1);
     }
 
 }

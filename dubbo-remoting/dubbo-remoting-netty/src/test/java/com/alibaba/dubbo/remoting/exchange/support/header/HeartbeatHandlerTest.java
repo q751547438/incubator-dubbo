@@ -56,7 +56,7 @@ public class HeartbeatHandlerTest {
 
     @Test
     public void testServerHeartbeat() throws Exception {
-        URL serverURL = URL.valueOf("header://localhost:55555");
+        URL serverURL = URL.valueOf("header://localhost:55555?transporter=netty3");
         serverURL = serverURL.addParameter(Constants.HEARTBEAT_KEY, 1000);
         TestHeartbeatHandler handler = new TestHeartbeatHandler();
         server = Exchangers.bind(serverURL, handler);
@@ -72,7 +72,7 @@ public class HeartbeatHandlerTest {
 
     @Test
     public void testHeartbeat() throws Exception {
-        URL serverURL = URL.valueOf("header://localhost:55555");
+        URL serverURL = URL.valueOf("header://localhost:55555?transporter=netty3");
         serverURL = serverURL.addParameter(Constants.HEARTBEAT_KEY, 1000);
         TestHeartbeatHandler handler = new TestHeartbeatHandler();
         server = Exchangers.bind(serverURL, handler);
@@ -89,7 +89,7 @@ public class HeartbeatHandlerTest {
     @Test
     public void testClientHeartbeat() throws Exception {
         FakeChannelHandlers.setTestingChannelHandlers();
-        URL serverURL = URL.valueOf("header://localhost:55555");
+        URL serverURL = URL.valueOf("header://localhost:55555?transporter=netty3");
         TestHeartbeatHandler handler = new TestHeartbeatHandler();
         server = Exchangers.bind(serverURL, handler);
         System.out.println("Server bind successfully");
@@ -111,22 +111,27 @@ public class HeartbeatHandlerTest {
             return request;
         }
 
+        @Override
         public void connected(Channel channel) throws RemotingException {
             ++connectCount;
         }
 
+        @Override
         public void disconnected(Channel channel) throws RemotingException {
             ++disconnectCount;
         }
 
+        @Override
         public void sent(Channel channel, Object message) throws RemotingException {
 
         }
 
+        @Override
         public void received(Channel channel, Object message) throws RemotingException {
             logger.error(this.getClass().getSimpleName() + message.toString());
         }
 
+        @Override
         public void caught(Channel channel, Throwable exception) throws RemotingException {
             exception.printStackTrace();
         }

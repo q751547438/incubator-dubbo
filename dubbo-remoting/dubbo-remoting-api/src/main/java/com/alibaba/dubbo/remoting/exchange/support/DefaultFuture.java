@@ -90,6 +90,29 @@ public class DefaultFuture implements ResponseFuture {
         }
     }
 
+    /**
+     * close a channel when a channel is inactive
+     * directly return the unfinished requests.
+     *
+     * @param channel channel to close
+     */
+    public static void closeChannel(Channel channel) {
+        for (long id : CHANNELS.keySet()) {
+            if (channel.equals(CHANNELS.get(id))) {
+                DefaultFuture future = getFuture(id);
+                if (future != null && !future.isDone()) {
+                    Response disconnectResponse = new Response(future.getId());
+                    disconnectResponse.setStatus(Response.CHANNEL_INACTIVE);
+                    disconnectResponse.setErrorMessage("Channel " +
+                            channel +
+                            " is inactive. Directly return the unFinished request : " +
+                            future.getRequest());
+                    DefaultFuture.received(channel, disconnectResponse);
+                }
+            }
+        }
+    }
+
     public static void received(Channel channel, Response response) {
         try {
             DefaultFuture future = FUTURES.remove(response.getId());
@@ -107,10 +130,12 @@ public class DefaultFuture implements ResponseFuture {
         }
     }
 
+    @Override
     public Object get() throws RemotingException {
         return get(timeout);
     }
 
+    @Override
     public Object get(int timeout) throws RemotingException {
         if (timeout <= 0) {
             timeout = Constants.DEFAULT_TIMEOUT;
@@ -145,10 +170,12 @@ public class DefaultFuture implements ResponseFuture {
         CHANNELS.remove(id);
     }
 
+    @Override
     public boolean isDone() {
         return response != null;
     }
 
+    @Override
     public void setCallback(ResponseCallback callback) {
         if (isDone()) {
             invokeCallback(callback);
@@ -276,6 +303,7 @@ public class DefaultFuture implements ResponseFuture {
 
     private static class RemotingInvocationTimeoutScan implements Runnable {
 
+        @Override
         public void run() {
             while (true) {
                 try {

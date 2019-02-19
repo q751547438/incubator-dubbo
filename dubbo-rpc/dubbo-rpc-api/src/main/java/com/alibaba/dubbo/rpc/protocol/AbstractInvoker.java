@@ -86,14 +86,17 @@ public abstract class AbstractInvoker<T> implements Invoker<T> {
         return attachment;
     }
 
+    @Override
     public Class<T> getInterface() {
         return type;
     }
 
+    @Override
     public URL getUrl() {
         return url;
     }
 
+    @Override
     public boolean isAvailable() {
         return available;
     }
@@ -102,6 +105,7 @@ public abstract class AbstractInvoker<T> implements Invoker<T> {
         this.available = available;
     }
 
+    @Override
     public void destroy() {
         if (!destroyed.compareAndSet(false, true)) {
             return;
@@ -113,24 +117,33 @@ public abstract class AbstractInvoker<T> implements Invoker<T> {
         return destroyed.get();
     }
 
+    @Override
     public String toString() {
         return getInterface() + " -> " + (getUrl() == null ? "" : getUrl().toString());
     }
 
+    @Override
     public Result invoke(Invocation inv) throws RpcException {
+        // if invoker is destroyed due to address refresh from registry, let's allow the current invoke to proceed
         if (destroyed.get()) {
-            throw new RpcException("Rpc invoker for service " + this + " on consumer " + NetUtils.getLocalHost()
-                    + " use dubbo version " + Version.getVersion()
-                    + " is DESTROYED, can not be invoked any more!");
+            logger.warn("Invoker for service " + this + " on consumer " + NetUtils.getLocalHost() + " is destroyed, "
+                    + ", dubbo version is " + Version.getVersion() + ", this invoker should not be used any longer");
         }
+
         RpcInvocation invocation = (RpcInvocation) inv;
         invocation.setInvoker(this);
         if (attachment != null && attachment.size() > 0) {
             invocation.addAttachmentsIfAbsent(attachment);
         }
-        Map<String, String> context = RpcContext.getContext().getAttachments();
-        if (context != null) {
-            invocation.addAttachmentsIfAbsent(context);
+        Map<String, String> contextAttachments = RpcContext.getContext().getAttachments();
+        if (contextAttachments != null && contextAttachments.size() != 0) {
+            /**
+             * invocation.addAttachmentsIfAbsent(context){@link RpcInvocation#addAttachmentsIfAbsent(Map)}should not be used here,
+             * because the {@link RpcContext#setAttachment(String, String)} is passed in the Filter when the call is triggered
+             * by the built-in retry mechanism of the Dubbo. The attachment to update RpcContext will no longer work, which is
+             * a mistake in most cases (for example, through Filter to RpcContext output traceId and spanId and other information).
+             */
+            invocation.addAttachments(contextAttachments);
         }
         if (getUrl().getMethodParameter(invocation.getMethodName(), Constants.ASYNC_KEY, false)) {
             invocation.setAttachment(Constants.ASYNC_KEY, Boolean.TRUE.toString());

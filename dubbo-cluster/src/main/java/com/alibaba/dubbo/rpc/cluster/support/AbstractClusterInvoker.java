@@ -25,6 +25,8 @@ import com.alibaba.dubbo.common.logger.LoggerFactory;
 import com.alibaba.dubbo.common.utils.NetUtils;
 import com.alibaba.dubbo.rpc.Invocation;
 import com.alibaba.dubbo.rpc.Invoker;
+import com.alibaba.dubbo.rpc.RpcContext;
+import com.alibaba.dubbo.rpc.RpcInvocation;
 import com.alibaba.dubbo.rpc.Result;
 import com.alibaba.dubbo.rpc.RpcException;
 import com.alibaba.dubbo.rpc.cluster.Directory;
@@ -33,6 +35,7 @@ import com.alibaba.dubbo.rpc.support.RpcUtils;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
 import java.util.concurrent.atomic.AtomicBoolean;
 
 /**
@@ -64,14 +67,17 @@ public abstract class AbstractClusterInvoker<T> implements Invoker<T> {
         this.availablecheck = url.getParameter(Constants.CLUSTER_AVAILABLE_CHECK_KEY, Constants.DEFAULT_CLUSTER_AVAILABLE_CHECK);
     }
 
+    @Override
     public Class<T> getInterface() {
         return directory.getInterface();
     }
 
+    @Override
     public URL getUrl() {
         return directory.getUrl();
     }
 
+    @Override
     public boolean isAvailable() {
         Invoker<T> invoker = stickyInvoker;
         if (invoker != null) {
@@ -80,6 +86,7 @@ public abstract class AbstractClusterInvoker<T> implements Invoker<T> {
         return directory.isAvailable();
     }
 
+    @Override
     public void destroy() {
         if (destroyed.compareAndSet(false, true)) {
             directory.destroy();
@@ -132,10 +139,6 @@ public abstract class AbstractClusterInvoker<T> implements Invoker<T> {
             return null;
         if (invokers.size() == 1)
             return invokers.get(0);
-        // If we only have two invokers, use round-robin instead.
-        if (invokers.size() == 2 && selected != null && !selected.isEmpty()) {
-            return selected.get(0) == invokers.get(0) ? invokers.get(1) : invokers.get(0);
-        }
         if (loadbalance == null) {
             loadbalance = ExtensionLoader.getExtensionLoader(LoadBalance.class).getExtension(Constants.DEFAULT_LOADBALANCE);
         }
@@ -153,7 +156,7 @@ public abstract class AbstractClusterInvoker<T> implements Invoker<T> {
                     int index = invokers.indexOf(invoker);
                     try {
                         //Avoid collision
-                        invoker = index < invokers.size() - 1 ? invokers.get(index + 1) : invoker;
+                        invoker = index < invokers.size() - 1 ? invokers.get(index + 1) : invokers.get(0);
                     } catch (Exception e) {
                         logger.warn(e.getMessage() + " may because invokers list dynamic change, ignore.", e);
                     }
@@ -221,13 +224,21 @@ public abstract class AbstractClusterInvoker<T> implements Invoker<T> {
         return null;
     }
 
+    @Override
     public Result invoke(final Invocation invocation) throws RpcException {
         checkWhetherDestroyed();
         LoadBalance loadbalance = null;
+
+        // binding attachments into invocation.
+        Map<String, String> contextAttachments = RpcContext.getContext().getAttachments();
+        if (contextAttachments != null && contextAttachments.size() != 0) {
+            ((RpcInvocation) invocation).addAttachments(contextAttachments);
+        }
+
         List<Invoker<T>> invokers = list(invocation);
         if (invokers != null && !invokers.isEmpty()) {
             loadbalance = ExtensionLoader.getExtensionLoader(LoadBalance.class).getExtension(invokers.get(0).getUrl()
-                    .getMethodParameter(invocation.getMethodName(), Constants.LOADBALANCE_KEY, Constants.DEFAULT_LOADBALANCE));
+                    .getMethodParameter(RpcUtils.getMethodName(invocation), Constants.LOADBALANCE_KEY, Constants.DEFAULT_LOADBALANCE));
         }
         RpcUtils.attachInvocationIdIfAsync(getUrl(), invocation);
         return doInvoke(invocation, invokers, loadbalance);

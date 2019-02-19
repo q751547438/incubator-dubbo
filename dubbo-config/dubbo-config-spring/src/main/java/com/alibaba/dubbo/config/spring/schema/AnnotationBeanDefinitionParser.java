@@ -20,6 +20,7 @@ import com.alibaba.dubbo.config.spring.AnnotationBean;
 import com.alibaba.dubbo.config.spring.beans.factory.annotation.ReferenceAnnotationBeanPostProcessor;
 import com.alibaba.dubbo.config.spring.beans.factory.annotation.ServiceAnnotationBeanPostProcessor;
 import com.alibaba.dubbo.config.spring.util.BeanRegistrar;
+
 import org.springframework.beans.factory.BeanFactory;
 import org.springframework.beans.factory.config.BeanDefinition;
 import org.springframework.beans.factory.support.BeanDefinitionBuilder;
@@ -51,6 +52,7 @@ public class AnnotationBeanDefinitionParser extends AbstractSingleBeanDefinition
      * @param parserContext
      * @param builder
      */
+    @Override
     protected void doParse(Element element, ParserContext parserContext, BeanDefinitionBuilder builder) {
 
         String packageToScan = element.getAttribute("package");
@@ -66,6 +68,7 @@ public class AnnotationBeanDefinitionParser extends AbstractSingleBeanDefinition
 
     }
 
+    @Override
     protected boolean shouldGenerateIdAsFallback() {
         return true;
     }
@@ -83,6 +86,7 @@ public class AnnotationBeanDefinitionParser extends AbstractSingleBeanDefinition
 
     }
 
+    @Override
     protected Class<?> getBeanClass(Element element) {
         return ServiceAnnotationBeanPostProcessor.class;
     }
